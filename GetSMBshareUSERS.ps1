@@ -27,10 +27,12 @@ Class SMBShareUser{
 	[string] $ADName;
 	[string] $Name;
 	[string] $ADType;
+	[int16]  $Level
 
-	SMBShareUser([string] $_SMBShare, [string] $_AccessType, [string] $_Path, [string] $_ADName, [string] $_Name, [string] $_ADType){
+	SMBShareUser([string] $_SMBShare, [string] $_AccessType, [string] $_Path, [string] $_ADName, [string] $_Name, [string] $_ADType, $_Level){
 		$this.Path = $_Path; 
 		$this.Name = $_Name; 
+		$this.Level = $_Level; 
 		$this.ADName = $_ADName; 
 		$this.ADType = $_ADType; 
 		$this.SMBShare = $_SMBShare; 
@@ -43,20 +45,23 @@ function Recursive {
 		[Parameter(Mandatory=$true)][string] $CurrSmbShare, 
 		[Parameter(Mandatory=$true)][AllowEmptyCollection()][System.Collections.ArrayList] $CurrPath, 
 		[Parameter(Mandatory=$true)][Microsoft.ActiveDirectory.Management.ADEntity] $CurrObj, 
-		[Parameter(Mandatory=$true)][string] $CurrAccess
+		[Parameter(Mandatory=$true)][string] $CurrAccess,
+		[Parameter(Mandatory=$false)][int16] $CurrLevel=0
 	)
 	switch ($CurrObj.ObjectClass) {
 		'group' {  
-			$CurrPath.Add($CurrObj.Name ) | Out-Null; 
+			[System.Collections.ArrayList]$NextPath = New-Object System.Collections.ArrayList($null) ; 
+			$NextPath.AddRange($CurrPath); 
+			$NextPath.Add($CurrObj.Name) | Out-Null; 
 			Get-ADGroup $CurrObj.Name | Get-ADGroupMember | ForEach-Object {
-				Recursive -CurrPath $CurrPath -CurrObj $_ -CurrAccess $CurrAccess -CurrSmbShare $CurrSmbShare
+				Recursive -CurrPath $NextPath -CurrObj $_ -CurrAccess $CurrAccess -CurrSmbShare $CurrSmbShare -CurrLevel ($CurrLevel+1)
 			} 
 		}
 		'user' { 
-			[SMBShareUser]::new( $CurrSmbShare, $CurrAccess, $CurrPath.ToArray() -join "`n", $CurrObj.samaccountname, $CurrObj.name, $CurrObj.ObjectClass); 
+			[SMBShareUser]::new( $CurrSmbShare, $CurrAccess, $CurrPath.ToArray() -join "`n", $CurrObj.samaccountname, $CurrObj.name, $CurrObj.ObjectClass, $CurrLevel); 
 		}
 		'computer' {  
-			[SMBShareUser]::new( $CurrSmbShare, $CurrAccess, $CurrPath.ToArray() -join "`n", $CurrObj.name, '', $CurrObj.ObjectClass); 
+			[SMBShareUser]::new( $CurrSmbShare, $CurrAccess, $CurrPath.ToArray() -join "`n", $CurrObj.name, '', $CurrObj.ObjectClass, $CurrLevel); 
 
 		}
 		Default {}
